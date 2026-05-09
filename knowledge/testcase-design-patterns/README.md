@@ -1,0 +1,60 @@
+# 测试设计模式路由
+
+本目录用于指导 Test-Design-Agent 将测试点转换为可执行测试用例。每个模式文件都应回答四个问题：
+
+1. 这个模式解决哪类测试点。
+2. 如何从测试点中抽取建模元素。
+3. 如何把模型派生为测试用例。
+4. 如何控制用例数量并写出可判定预期。
+
+## 模式分类
+
+| 分类 | 作用 | 使用方式 |
+|---|---|---|
+| 基于规格的测试 | 从需求规则、流程、状态、接口、数据范围等规格信息派生用例 | 作为大多数测试点的主生成方法 |
+| 基于经验的测试 | 根据历史缺陷、专家经验、易错点补充用例 | 作为补强方法，不替代规格建模 |
+| 基于风险的测试 | 根据业务影响和失败后果调整等级、覆盖深度和补充场景 | 作为上层策略叠加到主生成方法 |
+| 基于质量属性的测试 | 生成性能效率、可靠性与恢复性相关的验证用例 | 作为非功能关注点补充 |
+
+## 路由矩阵
+
+| 测试点信号 | 首选模式 | 辅助模式 |
+|---|---|---|
+| 范围、阈值、枚举、格式、数量、金额、时间窗口 | `specification-based/equivalence-boundary.md` | `risk-based/risk-based-test-design.md` |
+| 多输入参数、多配置项、多维组合、渠道/版本/角色组合 | `specification-based/data-combination.md` | `specification-based/equivalence-boundary.md` |
+| 多条件共同决定结果、业务规则矩阵 | `specification-based/decision-table.md` | `specification-based/cause-effect.md` |
+| 单个判断节点、校验点、流程分支、开关点 | `specification-based/decision-point.md` | `specification-based/equivalence-boundary.md` |
+| 账期、结算周期、批处理周期、重试周期、定时任务 | `specification-based/processing-cycle.md` | `specification-based/state-transition.md` |
+| 状态、生命周期、审批、取消、重试、超时、回退 | `specification-based/state-transition.md` | `specification-based/decision-point.md` |
+| 主流程、备选流程、用户故事、验收标准、端到端链路 | `specification-based/scenario-usecase-userstory.md` | `risk-based/risk-based-test-design.md` |
+| 复杂布尔原因与结果关系 | `specification-based/cause-effect.md` | `specification-based/decision-table.md` |
+| API、字段、错误码、回调、消息、第三方系统 | `specification-based/interface-contract.md` | `quality-attribute-based/reliability-recoverability.md` |
+| 历史缺陷、易错规则、专家经验 | `experience-based/error-guessing-checklist.md` | 与缺陷相关的规格模式 |
+| 资金、安全、合规、不可逆操作、高用户影响 | `risk-based/risk-based-test-design.md` | 与测试点结构匹配的规格模式 |
+| 性能、容量、响应时间、吞吐量 | `quality-attribute-based/performance-efficiency.md` | `specification-based/data-combination.md` |
+| 稳定性、容错、恢复、重试、降级 | `quality-attribute-based/reliability-recoverability.md` | `specification-based/processing-cycle.md` |
+
+## 选择规则
+
+1. 先选主模式。主模式必须能解释测试点的核心验证目标。
+2. 再选辅助模式。辅助模式只用于补充边界、风险、历史缺陷或质量属性，不替代主模式。
+3. 如果测试点同时命中多个基于规格的模式，按“状态/周期/判定/组合/范围/场景”的顺序优先选择更结构化的模式。
+4. 如果测试点只有“验证功能正常”之类泛化描述，应先进入澄清或降级为场景测试，不直接扩展大量用例。
+5. 如果缺少生成可执行步骤所需的入口、账号、数据或状态，生成中性步骤并登记待确认问题，不编造项目事实。
+
+## 用例数量控制
+
+| 测试点等级 | 默认策略 |
+|---|---|
+| Level 0 | 覆盖主路径、关键异常、必要边界或防护场景 |
+| Level 1 | 覆盖主路径和主要异常，必要时补充边界 |
+| Level 2 | 覆盖代表性正向或异常场景 |
+| Level 3 | 轻量覆盖，避免重复和穷举 |
+| Level 4 | 默认作为候选补充，除非用户或 memory 要求纳入 |
+
+## 输出给 `testcase-writing` 的设计方案
+
+每个模式最终都应形成如下设计方案，供用例编写阶段使用：
+
+| 测试点 ID | 主模式 | 辅助模式 | 覆盖意图 | 用例标题建议 | 等级 | 前置关注 | 步骤关注 | 预期关注 | 待确认信息 |
+|---|---|---|---|---|---|---|---|---|---|
