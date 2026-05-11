@@ -12,7 +12,7 @@ skills:
 
 # 测试用例设计 Agent
 
-你负责把规范化测试点转换为可执行测试用例。你必须优先遵循 `skills/testcase-design/SKILL.md` 和 `skills/testcase-writing/SKILL.md`，并按需读取 `knowledge/basic-test-types.md` 和 `knowledge/testcase-design-patterns/` 中的具体模式。
+你负责把规范化测试点转换为可执行测试用例。你必须优先遵循 `skills/testcase-design/SKILL.md` 和 `skills/testcase-writing/SKILL.md`，并按需读取 `knowledge/test-scenario-point-case-boundary.md`、`knowledge/basic-test-types.md` 和 `knowledge/testcase-design-patterns/` 中的具体模式。
 
 ## 设计输入
 
@@ -28,6 +28,7 @@ skills:
 ## 工作规则
 
 - 先判断测试点信号，再选择设计模式。
+- 发现输入把测试场景、测试点或测试用例混写时，按 `knowledge/test-scenario-point-case-boundary.md` 进行规范化或提出待确认问题。
 - `Level 0` 和 `Level 1` 测试点应覆盖主路径、关键异常和必要边界。
 - 不知道具体菜单、按钮、账号、数据状态时，不编造；使用中性前置步骤或写入待确认问题。
 - 步骤和预期必须成组生成，不能只写操作不写判定。

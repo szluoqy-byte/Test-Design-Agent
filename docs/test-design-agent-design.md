@@ -146,6 +146,7 @@ test-design-agent/
 │   └── testcase-review/
 ├── knowledge/
 │   ├── basic-test-types.md
+│   ├── test-scenario-point-case-boundary.md
 │   ├── testcase-standard.md
 │   ├── testcase-writing-guide.md
 │   ├── testcase-design-patterns/
@@ -209,7 +210,7 @@ test-design-agent/
 | `.claude-plugin/` | Claude Code plugin manifest |
 | `agents/` | 可选 subagent 角色定义，用于阶段性专家协作 |
 | `skills/` | 主流程和测试设计动作，定义怎么从测试点生成用例 |
-| `knowledge/` | 稳定测试类型、测试用例标准、可执行用例编写准则、设计模式和覆盖追溯标准 |
+| `knowledge/` | 稳定测试类型、测试场景/测试点/测试用例边界、测试用例标准、可执行用例编写准则、设计模式和覆盖追溯标准 |
 | `memory/` | 经人工确认的项目事实、业务域约定、历史缺陷和团队输出偏好 |
 | `templates/` | 测试用例设计输入包、最终报告、独立用例明细和澄清会话产物格式 |
 | `quality-gates/` | Agent 可读的质量门禁规则 |
@@ -237,6 +238,7 @@ Knowledge 按稳定知识域组织，供 skill 在运行时按需读取。
 | 路径 | 内容范围 | 主要使用方 |
 |---|---|---|
 | `knowledge/basic-test-types.md` | 基本测试类型定义、说明和质量属性覆盖范围，用于测试点大类/子类识别和覆盖面判断 | `testcase-design` |
+| `knowledge/test-scenario-point-case-boundary.md` | 需求、测试场景、设计约束、测试点和测试用例的定义、分层关系、粒度边界和示例 | `design-testcases-from-testpoints`、`testcase-design` |
 | `knowledge/testcase-standard.md` | 测试用例字段、编号、命名、粒度、等级体系和基础格式 | `testcase-writing`、`testcase-review` |
 | `knowledge/testcase-writing-guide.md` | 测试数据、前置条件、操作步骤、预期结果、可观察性和可判定性 | `testcase-writing`、`testcase-review` |
 | `knowledge/testcase-design-patterns/` | 测试设计模式库，包含路由索引和各模式详细说明 | `testcase-design` |
@@ -245,6 +247,8 @@ Knowledge 按稳定知识域组织，供 skill 在运行时按需读取。
 `knowledge/testcase-design-patterns/README.md` 维护测试点信号到设计模式文件的路由关系和读取顺序。具体模式文件维护适用条件、设计步骤、覆盖项识别方式、用例数量控制、常见测试数据、预期结果关注点和反例。
 
 `knowledge/basic-test-types.md` 维护测试类型知识。测试类型用于说明测试点关注的质量属性和验证方向，不等同于测试设计模式；具体用例展开仍由测试设计模式库完成。
+
+`knowledge/test-scenario-point-case-boundary.md` 维护需求、测试场景、设计约束、测试点和测试用例之间的层级关系。它用于输入规范化和粒度检查，避免把场景、测试点和用例混写。
 
 ### 6.4 测试设计模式库
 
@@ -494,6 +498,7 @@ flowchart LR
 | 文件 | 作用 |
 |---|---|
 | `basic-test-types.md` | 基本测试类型定义、说明和质量属性覆盖范围，用于测试点大类/子类识别和覆盖面判断 |
+| `test-scenario-point-case-boundary.md` | 需求、测试场景、设计约束、测试点和测试用例的分层关系、粒度边界和示例 |
 | `testcase-standard.md` | 测试用例字段、编号、命名、粒度、等级体系和基础格式标准 |
 | `testcase-writing-guide.md` | 测试数据、前置步骤、测试步骤、预期结果、可观察性和可判定性编写准则 |
 | `testcase-design-patterns/` | 测试用例设计模式目录，包含路由索引和各类模式的详细说明 |
