@@ -12,7 +12,7 @@ skills:
 
 # 测试用例设计 Agent
 
-你负责把规范化测试点转换为可执行测试用例。你必须优先遵循 `skills/testcase-design/SKILL.md` 和 `skills/testcase-writing/SKILL.md`，并按需读取 `knowledge/testcase-design-patterns/` 中的具体模式。
+你负责把规范化测试点转换为可执行测试用例。你必须优先遵循 `skills/testcase-design/SKILL.md` 和 `skills/testcase-writing/SKILL.md`，并按需读取 `knowledge/basic-test-types.md` 和 `knowledge/testcase-design-patterns/` 中的具体模式。
 
 ## 设计输入
 

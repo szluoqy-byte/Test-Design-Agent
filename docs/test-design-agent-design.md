@@ -145,6 +145,7 @@ test-design-agent/
 │   ├── memory-context-builder/
 │   └── testcase-review/
 ├── knowledge/
+│   ├── basic-test-types.md
 │   ├── testcase-standard.md
 │   ├── testcase-writing-guide.md
 │   ├── testcase-design-patterns/
@@ -208,7 +209,7 @@ test-design-agent/
 | `.claude-plugin/` | Claude Code plugin manifest |
 | `agents/` | 可选 subagent 角色定义，用于阶段性专家协作 |
 | `skills/` | 主流程和测试设计动作，定义怎么从测试点生成用例 |
-| `knowledge/` | 稳定测试用例标准、可执行用例编写准则、设计模式和覆盖追溯标准 |
+| `knowledge/` | 稳定测试类型、测试用例标准、可执行用例编写准则、设计模式和覆盖追溯标准 |
 | `memory/` | 经人工确认的项目事实、业务域约定、历史缺陷和团队输出偏好 |
 | `templates/` | 测试用例设计输入包、最终报告、独立用例明细和澄清会话产物格式 |
 | `quality-gates/` | Agent 可读的质量门禁规则 |
@@ -235,12 +236,15 @@ Knowledge 按稳定知识域组织，供 skill 在运行时按需读取。
 
 | 路径 | 内容范围 | 主要使用方 |
 |---|---|---|
+| `knowledge/basic-test-types.md` | 基本测试类型定义、说明和质量属性覆盖范围，用于测试点大类/子类识别和覆盖面判断 | `testcase-design` |
 | `knowledge/testcase-standard.md` | 测试用例字段、编号、命名、粒度、等级体系和基础格式 | `testcase-writing`、`testcase-review` |
 | `knowledge/testcase-writing-guide.md` | 测试数据、前置条件、操作步骤、预期结果、可观察性和可判定性 | `testcase-writing`、`testcase-review` |
 | `knowledge/testcase-design-patterns/` | 测试设计模式库，包含路由索引和各模式详细说明 | `testcase-design` |
 | `knowledge/coverage-traceability-standard.md` | 测试点到用例的覆盖关系、追溯矩阵、部分覆盖和未覆盖判定规则 | `testcase-design`、`testcase-review` |
 
 `knowledge/testcase-design-patterns/README.md` 维护测试点信号到设计模式文件的路由关系和读取顺序。具体模式文件维护适用条件、设计步骤、覆盖项识别方式、用例数量控制、常见测试数据、预期结果关注点和反例。
+
+`knowledge/basic-test-types.md` 维护测试类型知识。测试类型用于说明测试点关注的质量属性和验证方向，不等同于测试设计模式；具体用例展开仍由测试设计模式库完成。
 
 ### 6.4 测试设计模式库
 
@@ -280,7 +284,7 @@ flowchart TB
   Entry -.-> AgentLayer["可选 Agent 协作层\norchestrator / design / review"]
   AgentLayer -.-> MainSkill
   MainSkill --> SkillLayer["Skill 设计动作层\n规范化 / 设计 / 编写 / 评审"]
-  SkillLayer --> KnowledgeLayer["Knowledge 标准层\n用例标准 / 编写准则 / 设计模式 / 覆盖追溯"]
+  SkillLayer --> KnowledgeLayer["Knowledge 标准层\n测试类型 / 用例标准 / 编写准则 / 设计模式 / 覆盖追溯"]
   SkillLayer --> MemoryLayer["Memory 记忆层\n项目事实 / 账号数据 / 历史缺陷 / 偏好"]
   SkillLayer --> TemplateLayer["Template 模板层\n报告 / 明细 / 澄清会话"]
   SkillLayer --> QualityLayer["质量门禁层\n结构 / 可执行 / 预期 / 追溯 / 覆盖"]
@@ -489,6 +493,7 @@ flowchart LR
 
 | 文件 | 作用 |
 |---|---|
+| `basic-test-types.md` | 基本测试类型定义、说明和质量属性覆盖范围，用于测试点大类/子类识别和覆盖面判断 |
 | `testcase-standard.md` | 测试用例字段、编号、命名、粒度、等级体系和基础格式标准 |
 | `testcase-writing-guide.md` | 测试数据、前置步骤、测试步骤、预期结果、可观察性和可判定性编写准则 |
 | `testcase-design-patterns/` | 测试用例设计模式目录，包含路由索引和各类模式的详细说明 |
