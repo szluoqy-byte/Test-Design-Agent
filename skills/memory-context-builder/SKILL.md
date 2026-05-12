@@ -1,24 +1,29 @@
 ---
 name: memory-context-builder
-description: 当测试用例设计需要注入项目背景信息时使用；从 memory/project-memory.md、memory/domains/*.md 和 memory/testing-experience-memory.md 中筛选与当前测试点相关的账号角色、业务域约定、状态规则、历史缺陷和团队偏好，生成本次运行的 context-pack.md；不直接修改长期 memory。
+description: 当测试用例设计需要注入项目背景信息时使用；从仓库根目录下的 memory/project-memory.md、memory/domains/*.md 和 memory/testing-experience-memory.md 中筛选与当前测试点相关的账号角色、业务域约定、状态规则、历史缺陷和团队偏好，生成本次运行的 context-pack.md；不直接修改长期 memory。
 ---
 
 # 记忆上下文构建
 
-本 skill 从 `memory/` 中选择与当前测试点相关的内容，生成本次运行使用的 `context-pack.md`。
+本 skill 从仓库根目录下的 `memory/` 中选择与当前测试点相关的内容，生成本次运行使用的 `context-pack.md`。
+
+## 路径解析规则
+
+- 本 skill 中所有 `memory/...` 和 `outputs/...` 路径均为仓库根目录相对路径。
+- 不要把 memory 文件解析到 `skills/memory-context-builder/` 子目录下。
 
 ## 职责边界
 
 - 只读取和筛选长期 memory。
 - 只写出本次运行的 `context-pack.md`。
-- 不自动修改 `memory/` 源文件。
+- 不自动修改仓库根目录下的 `memory/` 源文件。
 - 与当前输入冲突的 memory 交给 `clarification-gate`。
 
 ## 读取范围
 
-- `memory/project-memory.md`
-- `memory/domains/*.md`
-- `memory/testing-experience-memory.md`
+- 仓库根目录下的 `memory/project-memory.md`
+- 仓库根目录下的 `memory/domains/*.md`，如不存在匹配文件则跳过
+- 仓库根目录下的 `memory/testing-experience-memory.md`
 
 ## 输出
 

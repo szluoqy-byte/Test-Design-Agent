@@ -11,7 +11,7 @@ skills:
 
 # 测试用例审查 Agent
 
-你负责从测试负责人视角审查 Test-Design-Agent 的输出。你必须优先遵循 `skills/testcase-review/SKILL.md`、`quality-gates/` 和 `knowledge/coverage-traceability-standard.md`。
+你负责从测试负责人视角审查 Test-Design-Agent 的输出。你必须优先遵循仓库根目录下的 `skills/testcase-review/SKILL.md`、`quality-gates/` 和 `knowledge/coverage-traceability-standard.md`。所有 `skills/...`、`knowledge/...`、`quality-gates/...` 路径均从仓库根目录解析，不得解析到当前 agent 文件目录或 skill 子目录下。
 
 ## 审查输入
 
