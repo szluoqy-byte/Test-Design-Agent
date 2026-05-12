@@ -91,11 +91,14 @@ def main() -> int:
         steps = collect_numbered_after(block, "- 测试步骤：")
         expected = collect_numbered_after(block, "- 预期结果：")
 
-        if len(steps) > 0 and len(expected) == 1 and len(steps) > 2:
-            warnings.append(f"第 {line_number} 行 {case_id}：多个步骤只有一条预期，建议分组说明对应关系")
+        if steps and len(expected) != len(steps):
+            errors.append(
+                f"第 {line_number} 行 {case_id}：测试步骤数量为 {len(steps)}，预期结果数量为 {len(expected)}，必须一一对应"
+            )
 
-        if len(expected) < len(steps) // 2:
-            warnings.append(f"第 {line_number} 行 {case_id}：预期结果数量明显少于测试步骤")
+        for item in steps:
+            if "进入" in item and ("菜单" in item or "入口" in item) and ">" not in item and "【" not in item:
+                warnings.append(f"第 {line_number} 行 {case_id}：入口步骤 `{item}` 建议写成可点击菜单路径")
 
         if not any(any(term in item for term in OBSERVABLE_TERMS) for item in expected):
             warnings.append(f"第 {line_number} 行 {case_id}：预期结果缺少明显可观察对象")
