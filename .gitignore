@@ -3,3 +3,5 @@ __pycache__/
 outputs/runs/*
 !outputs/runs/.gitkeep
 outputs/temp/
+memory/domains/*
+!memory/domains/.gitkeep
