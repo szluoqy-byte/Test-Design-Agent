@@ -32,7 +32,7 @@ TRACE_HEADER = "| 测试点 ID | 测试点摘要 | 覆盖用例 | 覆盖状态 |
 ALLOWED_LEVELS = {"Level 0", "Level 1", "Level 2", "Level 3", "Level 4"}
 ALLOWED_COVERAGE = {"已覆盖", "部分覆盖", "待确认", "未覆盖"}
 RE_CASE_HEADING = re.compile(r"^###\s+(TC-\d{3})\b")
-RE_TP_ID = re.compile(r"TP-\d{3}")
+RE_TEST_POINT_ID = re.compile(r"(?:TP|ITP)-\d{3}")
 RE_TC_ID = re.compile(r"TC-\d{3}")
 BANNED_CASE_FIELDS = {
     "关联测试点",
@@ -42,6 +42,7 @@ BANNED_CASE_FIELDS = {
     "适用环境",
     "自动化建议",
     "风险/备注",
+    "风险备注",
 }
 
 
@@ -75,7 +76,7 @@ def collect_trace_rows(lines: list[str]) -> list[tuple[int, list[str]]]:
         if not line.startswith("|"):
             break
         cells = split_row(line)
-        if cells and cells[0].startswith("TP-"):
+        if cells and RE_TEST_POINT_ID.fullmatch(cells[0]):
             rows.append((index + 1, cells))
     return rows
 
@@ -165,7 +166,7 @@ def main() -> int:
             errors.append("缺少测试点到用例追溯矩阵表头")
         trace_rows = collect_trace_rows(lines)
         if not trace_rows:
-            errors.append("追溯矩阵中未找到 TP-* 行")
+            errors.append("追溯矩阵中未找到 TP-* 或 ITP-* 行")
 
         covered_cases: set[str] = set()
         for line_number, cells in trace_rows:
@@ -173,7 +174,7 @@ def main() -> int:
                 errors.append(f"第 {line_number} 行：追溯矩阵期望 5 列，实际 {len(cells)} 列")
                 continue
             tp_id, summary, case_refs, status, note = cells
-            if not RE_TP_ID.fullmatch(tp_id):
+            if not RE_TEST_POINT_ID.fullmatch(tp_id):
                 errors.append(f"第 {line_number} 行：非法测试点 ID {tp_id}")
             if not summary:
                 errors.append(f"第 {line_number} 行：测试点摘要为空")
