@@ -37,6 +37,70 @@ OBSERVABLE_TERMS = [
     "成功",
     "失败",
 ]
+GUI_TERMS = [
+    "页面",
+    "菜单",
+    "页签",
+    "按钮",
+    "输入框",
+    "下拉",
+    "表格",
+    "列表",
+    "筛选",
+    "分页",
+    "弹窗",
+    "提示区",
+    "点击",
+]
+GUI_ACTION_TERMS = [
+    "点击",
+    "输入",
+    "选择",
+    "清空",
+    "打开",
+    "切换",
+    "关闭",
+]
+GENERIC_GUI_STEPS = [
+    "查看页面",
+    "验证布局",
+    "检查列表",
+    "执行查询",
+    "进行操作",
+]
+LOGIN_TERMS = ["登录", "登陆"]
+LOGIN_ENV_LABEL_TERMS = [
+    "ADC",
+    "FI",
+    "Web",
+    "WEB",
+    "管理后台",
+    "后台",
+    "控制台",
+    "门户",
+    "Portal",
+    "Console",
+]
+
+
+def contains_any(text: str, terms: list[str]) -> bool:
+    return any(term in text for term in terms)
+
+
+def has_gui_object(text: str) -> bool:
+    return "【" in text and "】" in text
+
+
+def is_gui_case(text: str, steps: list[str]) -> bool:
+    return contains_any(text, GUI_TERMS) or any(contains_any(step, GUI_TERMS) for step in steps)
+
+
+def is_login_step(step: str) -> bool:
+    return contains_any(step, LOGIN_TERMS) and contains_any(step, LOGIN_ENV_LABEL_TERMS)
+
+
+def is_complete_entry_step(step: str) -> bool:
+    return has_gui_object(step) and ">" in step and contains_any(step, ["点击", "进入", "打开", "切换"])
 
 
 def find_case_blocks(lines: list[str]) -> list[tuple[str, int, list[str]]]:
@@ -99,6 +163,24 @@ def main() -> int:
         for item in steps:
             if "进入" in item and ("菜单" in item or "入口" in item) and ">" not in item and "【" not in item:
                 warnings.append(f"第 {line_number} 行 {case_id}：入口步骤 `{item}` 建议写成可点击菜单路径")
+
+        if steps and is_gui_case(text, steps):
+            first_step = steps[0]
+            if not is_login_step(first_step):
+                errors.append(
+                    f"第 {line_number} 行 {case_id}：GUI 场景用例的测试步骤第 1 步必须描述登录带环境类型标签的环境，例如 ADC、FI、Web、管理后台"
+                )
+
+            if not any(is_complete_entry_step(item) for item in steps[1:]):
+                errors.append(
+                    f"第 {line_number} 行 {case_id}：GUI 场景用例缺少完整入口链路，入口步骤应包含【对象】和 > 路径"
+                )
+
+            for item in steps:
+                if contains_any(item, GENERIC_GUI_STEPS) and not has_gui_object(item):
+                    errors.append(f"第 {line_number} 行 {case_id}：GUI 步骤 `{item}` 缺少可自动化定位的操作对象")
+                if contains_any(item, GUI_ACTION_TERMS) and not is_login_step(item) and not has_gui_object(item):
+                    errors.append(f"第 {line_number} 行 {case_id}：GUI 动作 `{item}` 缺少【页面/控件/区域】对象")
 
         if not any(any(term in item for term in OBSERVABLE_TERMS) for item in expected):
             warnings.append(f"第 {line_number} 行 {case_id}：预期结果缺少明显可观察对象")
