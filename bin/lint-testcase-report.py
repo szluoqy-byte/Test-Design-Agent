@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import re
 import sys
+import argparse
 from pathlib import Path
 
 
@@ -29,8 +30,19 @@ DETAIL_REQUIRED_SECTIONS = [
 ]
 
 TRACE_HEADER = "| 测试点 ID | 测试点摘要 | 覆盖用例 | 覆盖状态 | 备注 |"
+QUALITY_GATE_HEADER = "| 门禁 | 结果 | 说明 |"
 ALLOWED_LEVELS = {"Level 0", "Level 1", "Level 2", "Level 3", "Level 4"}
 ALLOWED_COVERAGE = {"已覆盖", "部分覆盖", "待确认", "未覆盖"}
+ALLOWED_GATE_RESULTS = {"通过", "未通过", "待确认", "不适用"}
+REQUIRED_QUALITY_GATES = [
+    "结构字段",
+    "可执行性",
+    "预期可判定",
+    "追溯覆盖",
+    "覆盖完整性",
+    "等级一致性",
+    "重复用例",
+]
 RE_CASE_HEADING = re.compile(r"^###\s+(TC-\d{3})\b")
 RE_TEST_POINT_ID = re.compile(r"(?:TP|ITP)-\d{3}")
 RE_TC_ID = re.compile(r"TC-\d{3}")
@@ -81,6 +93,57 @@ def collect_trace_rows(lines: list[str]) -> list[tuple[int, list[str]]]:
     return rows
 
 
+def collect_table_rows(lines: list[str], header: str) -> list[tuple[int, list[str]]]:
+    rows: list[tuple[int, list[str]]] = []
+    try:
+        header_index = lines.index(header)
+    except ValueError:
+        return rows
+
+    for index in range(header_index + 2, len(lines)):
+        line = lines[index]
+        if not line.startswith("|"):
+            break
+        cells = split_row(line)
+        if cells:
+            rows.append((index + 1, cells))
+    return rows
+
+
+def is_placeholder(value: str) -> bool:
+    stripped = value.strip()
+    if not stripped:
+        return True
+    if stripped in {"-", "—", "无", "不适用"}:
+        return True
+    return stripped.startswith("<") and stripped.endswith(">")
+
+
+def collect_source_test_points(path: Path) -> tuple[set[str], list[str]]:
+    errors: list[str] = []
+    if not path.exists():
+        return set(), [f"源测试点文件不存在: {path}"]
+
+    source_ids: set[str] = set()
+    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        if not line.startswith("|"):
+            continue
+        cells = split_row(line)
+        if not cells or not RE_TEST_POINT_ID.fullmatch(cells[0]):
+            continue
+
+        summary = cells[1] if len(cells) > 1 else ""
+        if is_placeholder(summary):
+            continue
+        if cells[0] in source_ids:
+            errors.append(f"源测试点第 {line_number} 行：重复测试点 ID {cells[0]}")
+        source_ids.add(cells[0])
+
+    if not source_ids:
+        errors.append(f"源测试点文件未解析到有效 TP-* 或 ITP-* 行: {path}")
+    return source_ids, errors
+
+
 def validate_case_block(case_id: str, line_number: int, block: list[str]) -> list[str]:
     errors: list[str] = []
     text = "\n".join(block)
@@ -124,11 +187,15 @@ def validate_case_block(case_id: str, line_number: int, block: list[str]) -> lis
 
 
 def main() -> int:
-    if len(sys.argv) != 2:
-        print("用法: lint-testcase-report.py <报告.md>", file=sys.stderr)
-        return 2
+    parser = argparse.ArgumentParser(description="Lint a Markdown test case report or detail file.")
+    parser.add_argument("report", help="测试用例设计报告或独立明细 Markdown 文件")
+    parser.add_argument(
+        "--source",
+        help="原始测试点或测试用例设计输入包 Markdown 文件；提供后校验每个有效 TP-* / ITP-* 都出现在追溯矩阵中",
+    )
+    args = parser.parse_args()
 
-    path = Path(sys.argv[1])
+    path = Path(args.report)
     if not path.exists():
         print(f"文件不存在: {path}", file=sys.stderr)
         return 2
@@ -168,6 +235,7 @@ def main() -> int:
         if not trace_rows:
             errors.append("追溯矩阵中未找到 TP-* 或 ITP-* 行")
 
+        traced_points: set[str] = set()
         covered_cases: set[str] = set()
         for line_number, cells in trace_rows:
             if len(cells) != 5:
@@ -176,6 +244,8 @@ def main() -> int:
             tp_id, summary, case_refs, status, note = cells
             if not RE_TEST_POINT_ID.fullmatch(tp_id):
                 errors.append(f"第 {line_number} 行：非法测试点 ID {tp_id}")
+            else:
+                traced_points.add(tp_id)
             if not summary:
                 errors.append(f"第 {line_number} 行：测试点摘要为空")
             if status not in ALLOWED_COVERAGE:
@@ -192,6 +262,39 @@ def main() -> int:
 
         for case_id in sorted(seen_case_ids - covered_cases):
             errors.append(f"用例 {case_id} 未出现在追溯矩阵中")
+
+        if args.source:
+            source_ids, source_errors = collect_source_test_points(Path(args.source))
+            errors.extend(source_errors)
+            missing_points = source_ids - traced_points
+            extra_points = traced_points - source_ids
+            for tp_id in sorted(missing_points):
+                errors.append(f"源测试点 {tp_id} 未出现在追溯矩阵中")
+            for tp_id in sorted(extra_points):
+                errors.append(f"追溯矩阵包含源输入中不存在的测试点 {tp_id}")
+
+        if QUALITY_GATE_HEADER not in text:
+            errors.append("缺少质量门禁结果表头")
+        gate_rows = collect_table_rows(lines, QUALITY_GATE_HEADER)
+        if not gate_rows:
+            errors.append("质量门禁结果表中未找到门禁行")
+        seen_gates: set[str] = set()
+        for line_number, cells in gate_rows:
+            if len(cells) != 3:
+                errors.append(f"第 {line_number} 行：质量门禁结果期望 3 列，实际 {len(cells)} 列")
+                continue
+            gate_name, result, note = cells
+            if gate_name in seen_gates:
+                errors.append(f"第 {line_number} 行：重复质量门禁 {gate_name}")
+            seen_gates.add(gate_name)
+            if result not in ALLOWED_GATE_RESULTS:
+                errors.append(f"第 {line_number} 行：质量门禁 {gate_name} 使用了非法结果 {result}")
+            if result in {"未通过", "待确认", "不适用"} and not note:
+                errors.append(f"第 {line_number} 行：质量门禁 {gate_name} 为 {result} 时必须填写说明")
+
+        for gate_name in REQUIRED_QUALITY_GATES:
+            if gate_name not in seen_gates:
+                errors.append(f"质量门禁结果缺少必需门禁: {gate_name}")
 
     if errors:
         print("FAIL")

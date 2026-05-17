@@ -33,12 +33,19 @@ def main() -> int:
         root / "bin" / "lint-testcase-report.py",
         root / "bin" / "semantic-testcase-check.py",
     ]
+    source_by_report = {
+        "sample-order.test-cases.md": root / "examples" / "testpoints" / "sample-order-testpoints.md",
+    }
 
     failed = False
     for file_path in files:
         print(f"\n== {file_path.relative_to(root)} ==")
         for script in scripts:
-            code = run([sys.executable, str(script), str(file_path)], root)
+            command = [sys.executable, str(script), str(file_path)]
+            source = source_by_report.get(file_path.name)
+            if script.name == "lint-testcase-report.py" and source:
+                command.extend(["--source", str(source)])
+            code = run(command, root)
             if code != 0:
                 failed = True
 

@@ -178,6 +178,7 @@ test-design-agent/
 │   └── testing-experience-memory.md
 ├── templates/
 │   ├── testcase-design-input-template.md
+│   ├── testcase-design-plan-template.md
 │   ├── testcase-report-template.md
 │   ├── testcase-detail-template.md
 │   └── clarification-session-template.md
@@ -192,6 +193,8 @@ test-design-agent/
 │   └── expert-review-rubric.md
 ├── bin/
 │   ├── lint-testcase-report.py
+│   ├── build-memory-context.py
+│   ├── run-test-design.py
 │   ├── semantic-testcase-check.py
 │   └── smoke-test-design.py
 ├── examples/
@@ -279,6 +282,7 @@ Knowledge 按稳定知识域组织，供 skill 在运行时按需读取。
 | 路径 | 内容范围 | 输出场景 |
 |---|---|---|
 | `templates/testcase-design-input-template.md` | 测试用例设计输入包，包含需求信息、测试场景清单、测试场景详情、接口测试清单、接口测试详情、待确认信息和输入完整性自检；测试场景承载页面、业务流程、资料、性能、可靠性等对象，场景测试条件承载入口、用户/角色、前置条件、测试数据因子、业务设计约束和自由补充说明，接口测试对象承载接口契约、字段、错误码、幂等和鉴权等对象 | 输入准备、评审前补充上下文 |
+| `templates/testcase-design-plan-template.md` | 测试用例设计方案中间产物，统一 `testcase-design` 到 `testcase-writing` 的字段契约 | 设计阶段、编写阶段输入 |
 | `templates/testcase-report-template.md` | 完整测试用例设计报告，包含设计范围、输入摘要、澄清摘要、用例设计方案、用例明细、追溯矩阵、覆盖审查、质量门禁、专家评分、待确认问题和 memory 更新建议 | 默认交付报告 |
 | `templates/testcase-detail-template.md` | 独立测试用例明细，只包含用例编号、用例名称、用例等级、前置步骤、测试步骤和预期结果 | 用例平台导入、专项评审 |
 | `templates/clarification-session-template.md` | 澄清问题、用户回答、未解决问题和上下文合并结果 | 澄清会话记录 |
@@ -334,8 +338,8 @@ flowchart TD
 
 ### 8.1 流程说明
 
-1. 固定当前会话工作目录为 `PROJECT_ROOT`，创建独立运行目录 `${PROJECT_ROOT}/outputs/runs/<run-id>/`。
-2. 使用 `memory-context-builder` 筛选本次相关项目上下文，生成 `context-pack.md`。
+1. 固定当前会话工作目录为 `PROJECT_ROOT`，创建独立运行目录 `${PROJECT_ROOT}/outputs/runs/<run-id>/`；可使用 `bin/run-test-design.py <输入文件>` 准备运行目录、初始模板和上下文包。
+2. 使用 `memory-context-builder` 或 `bin/build-memory-context.py` 筛选本次相关项目上下文，生成 `context-pack.md`。
 3. 在主入口 `design-testcases-from-testpoints` 内完成输入规范化：识别测试点字段、保留来源编号、检查明显缺口和重复项。
 4. 对缺失字段、编号重复、测试点含义不清、业务约束缺失执行澄清检查。
 5. 使用 `testcase-design` 为每条测试点制定用例设计方案，判断需要生成的用例数量、类型、等级、覆盖意图和扩展策略。
@@ -470,7 +474,7 @@ flowchart LR
 |---|---|---|
 | 记忆上下文包 | `memory-context-builder` | 注入本次相关项目事实和测试经验 |
 | 规范化测试点清单 | `design-testcases-from-testpoints` | 整理测试点字段，保留来源编号，识别缺口和重复项 |
-| 用例设计方案 | `testcase-design` | 决定每条测试点扩展成哪些用例，包含用例类型、等级、覆盖意图和数量控制 |
+| 用例设计方案 | `testcase-design` | 决定每条测试点扩展成哪些用例，包含主模式、辅助模式、覆盖意图、标题建议、等级、前置关注、步骤关注、预期关注和待确认信息 |
 | 可执行测试用例草稿 | `testcase-writing` | 生成用例名称、用例编号、用例等级、前置步骤、测试步骤和预期结果 |
 | 追溯矩阵与审查结果 | `testcase-review` | 证明测试点覆盖完整，并发现遗漏、冗余、等级不一致和不可执行问题 |
 | 质量门禁结果 | `quality-gates/` 和 `bin/` | 形成发布前质量结论 |
@@ -619,7 +623,9 @@ flowchart TD
 | `coverage-check.md` | 高风险测试点是否覆盖主路径、异常、边界、权限或数据风险 |
 | `level-consistency-check.md` | 用例等级是否与测试点风险、业务影响和 memory 规则一致 |
 | `duplicate-testcase-check.md` | 是否存在重复、近似重复或只改名称不改验证目标的用例 |
-| `bin/lint-testcase-report.py` | 机械检查报告结构、编号格式、必填字段和追溯矩阵 |
+| `bin/build-memory-context.py` | 机械生成 `context-pack.md` 初稿，枚举并匹配本地 `memory/domains/*.md` |
+| `bin/run-test-design.py` | 准备 run 目录、上下文包、澄清记录、设计方案和报告/明细初始文件，并可对已生成产物执行检查 |
+| `bin/lint-testcase-report.py` | 机械检查报告结构、编号格式、必填字段、追溯矩阵、源测试点覆盖和质量门禁结果 |
 | `bin/semantic-testcase-check.py` | 启发式检查步骤空泛、预期含糊、数据缺失和覆盖异常 |
 | `bin/smoke-test-design.py` | 对示例测试点执行回归验证 |
 
@@ -678,7 +684,7 @@ flowchart TD
 - 高风险测试点能够体现主路径、异常、边界、权限、接口或数据一致性等必要扩展。
 - 报告包含测试点到用例追溯矩阵。
 - 报告包含覆盖审查结果、质量门禁结果、专家评审评分和待确认问题。
-- 示例报告可通过 `bin/lint-testcase-report.py`、`bin/semantic-testcase-check.py` 和 `bin/smoke-test-design.py`。
+- 示例报告可通过 `bin/lint-testcase-report.py <报告路径> --source <输入路径>`、`bin/semantic-testcase-check.py` 和 `bin/smoke-test-design.py`。
 
 ## 19. 版本范围
 
