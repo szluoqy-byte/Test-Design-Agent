@@ -12,6 +12,8 @@ from pathlib import Path
 PLACEHOLDER_TERMS = ("待用户确认后补充", "待补充", "暂无")
 RE_HEADING = re.compile(r"^#\s+(.+)$")
 RE_BRACKET_OBJECT = re.compile(r"【([^】]+)】")
+RE_FRONT_MATTER = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
+RE_ENTRY_PATH = re.compile(r"[\u4e00-\u9fffA-Za-z0-9_【】/（）() -]+(?:\s*>\s*[\u4e00-\u9fffA-Za-z0-9_【】/（）() -]+)+")
 
 
 @dataclass
@@ -21,12 +23,49 @@ class DomainMatch:
     score: int
     reasons: list[str]
     content: str
+    entry_paths: list[str]
+
+
+@dataclass
+class DomainInfo:
+    path: Path
+    title: str
+    content: str
+    metadata: dict[str, list[str]]
 
 
 def read_text(path: Path) -> str:
     if not path.exists():
         return ""
     return path.read_text(encoding="utf-8")
+
+
+def parse_front_matter(text: str) -> tuple[dict[str, list[str]], str]:
+    match = RE_FRONT_MATTER.match(text)
+    if not match:
+        return {}, text
+
+    metadata: dict[str, list[str]] = {}
+    current_key = ""
+    for raw_line in match.group(1).splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line.startswith("- ") and current_key:
+            metadata.setdefault(current_key, []).append(line[2:].strip().strip("\"'"))
+            continue
+        if ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        current_key = key.strip()
+        value = value.strip()
+        if not value:
+            metadata.setdefault(current_key, [])
+            continue
+        values = [item.strip().strip("\"'") for item in value.split(",")]
+        metadata[current_key] = [item for item in values if item]
+
+    return metadata, text[match.end() :]
 
 
 def first_title(text: str, fallback: str) -> str:
@@ -46,13 +85,55 @@ def remove_placeholder_lines(text: str) -> str:
     return "\n".join(kept).strip()
 
 
-def extract_keywords(text: str, title: str, path: Path) -> set[str]:
+def extract_entry_paths(text: str, metadata: dict[str, list[str]]) -> list[str]:
+    paths: list[str] = []
+    paths.extend(metadata.get("entry_paths", []))
+    paths.extend(metadata.get("entry-paths", []))
+    paths.extend(metadata.get("入口路径", []))
+    for match in RE_ENTRY_PATH.findall(text):
+        normalized = normalize_entry_path(match)
+        if normalized:
+            paths.append(normalized)
+    return dedupe(paths)
+
+
+def normalize_entry_path(path: str) -> str:
+    parts = [part.strip(" `|【】") for part in path.split(">")]
+    parts = [part for part in parts if part and part not in {"示例", "例如"}]
+    if len(parts) < 2:
+        return ""
+    return " > ".join(parts)
+
+
+def dedupe(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for value in values:
+        normalized = value.strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        result.append(normalized)
+    return result
+
+
+def load_domain(path: Path) -> DomainInfo:
+    raw_content = read_text(path)
+    metadata, body = parse_front_matter(raw_content)
+    title = metadata.get("title", [first_title(body, path.stem)])[0]
+    return DomainInfo(path, title, body, metadata)
+
+
+def extract_keywords(info: DomainInfo) -> set[str]:
     keywords: set[str] = set()
-    for value in [path.stem, title]:
+    metadata_keywords: list[str] = []
+    for key in ["keywords", "aliases", "products", "systems", "关键词", "别名"]:
+        metadata_keywords.extend(info.metadata.get(key, []))
+    for value in [info.path.stem, info.title, *metadata_keywords]:
         value = value.strip()
         if value and value not in {"README", ".gitkeep"}:
             keywords.add(value)
-    for line in text.splitlines():
+    for line in info.content.splitlines():
         stripped = line.strip()
         if stripped.startswith("#"):
             heading = stripped.lstrip("#").strip()
@@ -68,10 +149,41 @@ def extract_keywords(text: str, title: str, path: Path) -> set[str]:
     return {keyword for keyword in keywords if len(keyword) >= 2}
 
 
+def path_target(path: str) -> str:
+    parts = [part.strip() for part in path.split(">") if part.strip()]
+    return parts[-1] if parts else ""
+
+
+def collect_input_entry_paths(input_text: str) -> list[str]:
+    return dedupe([normalize_entry_path(match) for match in RE_ENTRY_PATH.findall(input_text)])
+
+
+def collect_entry_conflicts(input_paths: list[str], matches: list[DomainMatch], root: Path) -> list[str]:
+    conflicts: list[str] = []
+    if not input_paths or not matches:
+        return conflicts
+
+    domain_paths: list[tuple[str, Path]] = []
+    for match in matches:
+        for entry_path in match.entry_paths:
+            domain_paths.append((entry_path, match.path))
+
+    for input_path in input_paths:
+        input_target = path_target(input_path)
+        if not input_target:
+            continue
+        for domain_path, domain_file in domain_paths:
+            if path_target(domain_path) == input_target and domain_path != input_path:
+                conflicts.append(
+                    f"| `{input_path}` | `{domain_path}` | `{relative(domain_file, root)}` | 同一目标入口路径不一致 |"
+                )
+    return dedupe(conflicts)
+
+
 def match_domain(domain_path: Path, input_text: str) -> DomainMatch | None:
-    content = read_text(domain_path)
-    title = first_title(content, domain_path.stem)
-    keywords = extract_keywords(content, title, domain_path)
+    info = load_domain(domain_path)
+    keywords = extract_keywords(info)
+    entry_paths = extract_entry_paths(info.content, info.metadata)
     reasons: list[str] = []
 
     for keyword in sorted(keywords, key=len, reverse=True):
@@ -79,10 +191,25 @@ def match_domain(domain_path: Path, input_text: str) -> DomainMatch | None:
             reasons.append(f"输入命中 `{keyword}`")
         if len(reasons) >= 5:
             break
+    for entry_path in entry_paths:
+        target = path_target(entry_path)
+        if entry_path in input_text:
+            reasons.append(f"输入命中完整入口 `{entry_path}`")
+        elif target and target in input_text:
+            reasons.append(f"输入命中入口目标 `{target}`")
+        if len(reasons) >= 5:
+            break
 
     if not reasons:
         return None
-    return DomainMatch(domain_path, title, len(reasons), reasons, remove_placeholder_lines(content))
+    return DomainMatch(
+        domain_path,
+        info.title,
+        len(reasons),
+        reasons,
+        remove_placeholder_lines(info.content),
+        entry_paths,
+    )
 
 
 def relative(path: Path, root: Path) -> str:
@@ -101,6 +228,8 @@ def build_context(root: Path, input_path: Path, run_dir: Path) -> str:
         (match for path in domain_paths if (match := match_domain(path, input_text))),
         key=lambda item: (-item.score, item.path.name),
     )
+    input_entry_paths = collect_input_entry_paths(input_text)
+    entry_conflicts = collect_entry_conflicts(input_entry_paths, matches, root)
 
     lines: list[str] = [
         "# 测试设计记忆上下文包",
@@ -118,12 +247,19 @@ def build_context(root: Path, input_path: Path, run_dir: Path) -> str:
     lines.extend(["", "## 3. 匹配到的业务域约定", ""])
     if matches:
         for match in matches:
+            entry_path_lines = [f"- `{entry_path}`" for entry_path in match.entry_paths]
             lines.extend(
                 [
                     f"### {match.title}",
                     "",
                     f"- domain 文件：`{relative(match.path, root)}`",
                     f"- 匹配依据：{'; '.join(match.reasons)}",
+                    "",
+                    "#### 可用于入口补全的路径",
+                    "",
+                    *(entry_path_lines if entry_path_lines else ["未声明可机械识别的入口路径。"]),
+                    "",
+                    "#### 已确认内容",
                     "",
                     match.content or "该 domain 文件没有可直接注入的已确认内容。",
                     "",
@@ -140,10 +276,26 @@ def build_context(root: Path, input_path: Path, run_dir: Path) -> str:
             "",
             "## 5. 可能冲突或需要用户确认的信息",
             "",
-            "未发现可机械识别的 memory 冲突；具体业务冲突仍需由 `clarification-gate` 结合输入语义判断。",
-            "",
         ]
     )
+    if entry_conflicts:
+        lines.extend(
+            [
+                "| 当前输入入口路径 | memory 入口路径 | domain 文件 | 冲突说明 |",
+                "|---|---|---|---|",
+                *entry_conflicts,
+                "",
+                "上述冲突仅表示入口路径文本不一致，具体以当前输入优先，并交给 `clarification-gate` 判断是否需要确认。",
+                "",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "未发现可机械识别的 memory 入口路径冲突；具体业务冲突仍需由 `clarification-gate` 结合输入语义判断。",
+                "",
+            ]
+        )
     return "\n".join(lines)
 
 

@@ -46,6 +46,7 @@ REQUIRED_QUALITY_GATES = [
 RE_CASE_HEADING = re.compile(r"^###\s+(TC-\d{3})\b")
 RE_TEST_POINT_ID = re.compile(r"(?:TP|ITP)-\d{3}")
 RE_TC_ID = re.compile(r"TC-\d{3}")
+RE_TEMPLATE_PLACEHOLDER = re.compile(r"<[^>\n]{1,120}>")
 BANNED_CASE_FIELDS = {
     "关联测试点",
     "模块",
@@ -117,6 +118,16 @@ def is_placeholder(value: str) -> bool:
     if stripped in {"-", "—", "无", "不适用"}:
         return True
     return stripped.startswith("<") and stripped.endswith(">")
+
+
+def collect_template_placeholders(text: str, lines: list[str]) -> list[str]:
+    errors: list[str] = []
+    for line_number, line in enumerate(lines, start=1):
+        for match in RE_TEMPLATE_PLACEHOLDER.finditer(line):
+            errors.append(f"第 {line_number} 行：存在未替换模板占位符 {match.group(0)}")
+    if "{{" in text or "}}" in text:
+        errors.append("存在未替换模板占位符 {{...}}")
+    return errors
 
 
 def collect_source_test_points(path: Path) -> tuple[set[str], list[str]]:
@@ -213,6 +224,8 @@ def main() -> int:
                 errors.append("缺少 Markdown 一级标题")
         elif section not in text:
             errors.append(f"缺少必需章节: {section}")
+
+    errors.extend(collect_template_placeholders(text, lines))
 
     blocks = find_case_blocks(lines)
     if not blocks:

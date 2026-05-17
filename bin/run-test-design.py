@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Prepare a reproducible Test-Design-Agent run directory and optional checks."""
+"""Prepare a reproducible Test-Design-Agent run directory and optional checks.
+
+This helper does not generate test cases by itself; it only prepares files that
+the agent workflow can fill in and validates already generated outputs.
+"""
 
 from __future__ import annotations
 
@@ -26,9 +30,20 @@ def read_template(root: Path, name: str) -> str:
     return (root / "templates" / name).read_text(encoding="utf-8")
 
 
-def write_if_missing(path: Path, text: str) -> None:
+RE_TEMPLATE_PLACEHOLDER = re.compile(r"<[^>\n]{1,120}>")
+
+
+def write_if_missing(path: Path, text: str) -> bool:
     if not path.exists():
         path.write_text(text, encoding="utf-8")
+        return True
+    return False
+
+
+def has_template_placeholders(path: Path) -> bool:
+    if not path.exists():
+        return False
+    return bool(RE_TEMPLATE_PLACEHOLDER.search(path.read_text(encoding="utf-8")))
 
 
 def run(cmd: list[str], cwd: Path) -> int:
@@ -39,12 +54,13 @@ def run(cmd: list[str], cwd: Path) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Create a run directory, build context-pack.md, and optionally validate generated outputs."
+        description="Prepare a Test-Design-Agent run directory. This command does not generate test cases.",
+        epilog="Use --validate after the agent has filled the report and detail files; freshly created template files are skipped.",
     )
     parser.add_argument("input", help="测试点文件或测试用例设计输入包")
     parser.add_argument("--project-root", default=".", help="仓库根目录，默认当前目录")
     parser.add_argument("--run-id", help="自定义 run-id；默认按时间、输入文件名和短哈希生成")
-    parser.add_argument("--validate", action="store_true", help="如果报告和明细已生成，则运行 lint 和 semantic 检查")
+    parser.add_argument("--validate", action="store_true", help="校验已生成的报告和明细；本轮新建的模板文件会跳过")
     args = parser.parse_args()
 
     root = Path(args.project_root).resolve()
@@ -80,10 +96,15 @@ def main() -> int:
 
     report_path = run_dir / f"{source_stem}.test-cases.md"
     detail_path = run_dir / f"{source_stem}.testcase-details.md"
-    write_if_missing(run_dir / "clarification-session.md", clarification_template)
-    write_if_missing(run_dir / "testcase-design-plan.md", design_plan_template)
-    write_if_missing(report_path, report_template)
-    write_if_missing(detail_path, detail_template)
+    created_files: set[Path] = set()
+    for path, content in [
+        (run_dir / "clarification-session.md", clarification_template),
+        (run_dir / "testcase-design-plan.md", design_plan_template),
+        (report_path, report_template),
+        (detail_path, detail_template),
+    ]:
+        if write_if_missing(path, content):
+            created_files.add(path)
 
     print("\n运行目录已准备完成：")
     print(f"- run-dir: {run_dir}")
@@ -93,22 +114,40 @@ def main() -> int:
     print(f"- details: {detail_path}")
 
     if args.validate:
-        commands = [
-            [sys.executable, str(root / "bin" / "lint-testcase-report.py"), str(detail_path)],
-            [sys.executable, str(root / "bin" / "semantic-testcase-check.py"), str(detail_path)],
-            [
-                sys.executable,
-                str(root / "bin" / "lint-testcase-report.py"),
-                str(report_path),
-                "--source",
-                str(input_path),
-            ],
-            [sys.executable, str(root / "bin" / "semantic-testcase-check.py"), str(report_path)],
+        validations = [
+            (
+                detail_path,
+                [
+                    [sys.executable, str(root / "bin" / "lint-testcase-report.py"), str(detail_path)],
+                    [sys.executable, str(root / "bin" / "semantic-testcase-check.py"), str(detail_path)],
+                ],
+            ),
+            (
+                report_path,
+                [
+                    [
+                        sys.executable,
+                        str(root / "bin" / "lint-testcase-report.py"),
+                        str(report_path),
+                        "--source",
+                        str(input_path),
+                    ],
+                    [sys.executable, str(root / "bin" / "semantic-testcase-check.py"), str(report_path)],
+                ],
+            ),
         ]
         failed = False
-        for command in commands:
-            if run(command, root) != 0:
-                failed = True
+        skipped = False
+        for target_path, commands in validations:
+            if target_path in created_files and has_template_placeholders(target_path):
+                print(f"SKIP {target_path}: 本轮新建的是待填写模板，尚未生成可校验产物。")
+                skipped = True
+                continue
+            for command in commands:
+                if run(command, root) != 0:
+                    failed = True
+        if skipped and not failed:
+            print("校验已跳过新建模板文件；生成真实用例后可再次运行 --validate。")
         return 1 if failed else 0
 
     return 0

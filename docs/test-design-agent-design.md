@@ -338,8 +338,8 @@ flowchart TD
 
 ### 8.1 流程说明
 
-1. 固定当前会话工作目录为 `PROJECT_ROOT`，创建独立运行目录 `${PROJECT_ROOT}/outputs/runs/<run-id>/`；可使用 `bin/run-test-design.py <输入文件>` 准备运行目录、初始模板和上下文包。
-2. 使用 `memory-context-builder` 或 `bin/build-memory-context.py` 筛选本次相关项目上下文，生成 `context-pack.md`。
+1. 固定当前会话工作目录为 `PROJECT_ROOT`，创建独立运行目录 `${PROJECT_ROOT}/outputs/runs/<run-id>/`；可使用 `bin/run-test-design.py <输入文件>` 准备运行目录、初始模板和上下文包。该脚本不调用模型生成测试用例，只负责准备运行骨架和校验已有产物。
+2. 使用 `memory-context-builder` 或 `bin/build-memory-context.py` 筛选本次相关项目上下文，生成 `context-pack.md`。domain memory 可通过 `keywords`、`aliases` 和 `entry_paths` metadata 提供稳定匹配信号，脚本可识别同一目标入口路径不一致的机械冲突。
 3. 在主入口 `design-testcases-from-testpoints` 内完成输入规范化：识别测试点字段、保留来源编号、检查明显缺口和重复项。
 4. 对缺失字段、编号重复、测试点含义不清、业务约束缺失执行澄清检查。
 5. 使用 `testcase-design` 为每条测试点制定用例设计方案，判断需要生成的用例数量、类型、等级、覆盖意图和扩展策略。
@@ -623,9 +623,9 @@ flowchart TD
 | `coverage-check.md` | 高风险测试点是否覆盖主路径、异常、边界、权限或数据风险 |
 | `level-consistency-check.md` | 用例等级是否与测试点风险、业务影响和 memory 规则一致 |
 | `duplicate-testcase-check.md` | 是否存在重复、近似重复或只改名称不改验证目标的用例 |
-| `bin/build-memory-context.py` | 机械生成 `context-pack.md` 初稿，枚举并匹配本地 `memory/domains/*.md` |
-| `bin/run-test-design.py` | 准备 run 目录、上下文包、澄清记录、设计方案和报告/明细初始文件，并可对已生成产物执行检查 |
-| `bin/lint-testcase-report.py` | 机械检查报告结构、编号格式、必填字段、追溯矩阵、源测试点覆盖和质量门禁结果 |
+| `bin/build-memory-context.py` | 机械生成 `context-pack.md` 初稿，枚举并匹配本地 `memory/domains/*.md`，优先读取 domain metadata，并输出可识别的入口路径冲突 |
+| `bin/run-test-design.py` | 准备 run 目录、上下文包、澄清记录、设计方案和报告/明细初始文件，并可对已生成产物执行检查；不负责生成测试用例正文 |
+| `bin/lint-testcase-report.py` | 机械检查报告结构、编号格式、必填字段、追溯矩阵、源测试点覆盖、质量门禁结果和未替换模板占位符 |
 | `bin/semantic-testcase-check.py` | 启发式检查步骤空泛、预期含糊、数据缺失和覆盖异常 |
 | `bin/smoke-test-design.py` | 对示例测试点执行回归验证 |
 
