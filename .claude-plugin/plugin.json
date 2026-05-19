@@ -3,11 +3,6 @@
   "description": "面向测试点的测试用例设计插件，基于测试设计模式、项目记忆和质量门禁生成完整、规范、可执行、可追溯的测试用例。",
   "version": "0.1.0",
   "skills": "./skills/",
-  "agents": [
-    "./agents/orchestrator.md",
-    "./agents/testcase-design-agent.md",
-    "./agents/testcase-review-agent.md"
-  ],
   "author": {
     "name": "Test Design Agent Team"
   },
