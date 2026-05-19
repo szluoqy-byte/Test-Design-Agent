@@ -67,7 +67,7 @@ outputs/runs/<run-id>/<需求文件名安全短名>.testpoint-details.md
 
 输入包中的测试场景清单使用 `场景测试类型` 表达场景主要关注的测试类型，不要求填写场景等级。测试点不要求填写级别；用例等级由 Test-Design-Agent 在测试设计阶段结合等级规则、风险、业务影响和项目 memory 推导。
 
-若输入缺少关键字段，Agent 应进入澄清或降级策略：能安全补全的字段记录推断依据，不能安全补全的字段写入待确认问题，不得编造业务事实。
+若输入缺少关键字段，Agent 应进入待确认或降级策略：能安全补全的字段记录推断依据，不能安全补全的字段写入最终报告的待确认问题，不得编造业务事实，不在中途打断用户。
 
 ### 3.2 输出
 
@@ -108,7 +108,7 @@ ${PROJECT_ROOT}/outputs/runs/<run-id>/<测试点文件名安全短名>.testcase-
 | 预期可观察 | 预期结果必须包含界面、接口响应、数据状态、日志、通知、权限结果等可观察对象 |
 | 数据显式化 | 测试数据不能隐含在步骤里，关键输入、边界值和账号角色应显式列出 |
 | 风险分层 | 高风险测试点优先扩展为更完整的正向、异常、边界和回归用例 |
-| 澄清克制 | 只在缺失信息影响可执行性或会导致错误业务假设时提问 |
+| 待确认后置 | 运行过程中不向用户提问；缺失信息影响可执行性或会导致错误业务假设时，统一写入最终报告的待确认问题 |
 | 质量闭环 | 生成后必须经过结构、追溯、可执行性、预期可判定性、覆盖和等级校验 |
 | 平台可适配 | Claude Code plugin、OpenCode、OpenClaw 或其他执行容器只作为运行载体，核心逻辑沉淀在 Markdown 文件中 |
 
@@ -226,7 +226,7 @@ test-design-agent/
 | `skills/` | 主流程和测试设计动作，是手工维护的 skill 唯一事实源 |
 | `knowledge/` | 稳定测试类型、测试场景/测试点/测试用例边界、测试用例标准、可执行用例编写准则、设计模式和覆盖追溯标准 |
 | `memory/` | 经人工确认的项目事实、业务域约定、历史缺陷和团队输出偏好 |
-| `templates/` | 测试用例设计输入包、最终报告、独立用例明细和澄清会话产物格式 |
+| `templates/` | 测试用例设计输入包、最终报告、独立用例明细和待确认记录产物格式 |
 | `quality-gates/` | 流程可读的质量门禁规则 |
 | `bin/` | 可机械执行的结构 lint、语义启发式检查、runtime 适配校验和 smoke 回归脚本 |
 | `examples/` | 示例测试点输入和预期用例输出 |
@@ -234,7 +234,7 @@ test-design-agent/
 
 ### 6.2 Skill 结构
 
-Skill 按主流程动作组织，覆盖上下文构建、用例设计、用例编写、澄清治理和质量审查。
+Skill 按主流程动作组织，覆盖上下文构建、用例设计、用例编写、待确认治理和质量审查。
 
 Claude Code 直接通过 `.claude-plugin/plugin.json` 加载根目录 `skills/`。OpenCode 通过 `.opencode/skills/` 发现 skill；该目录是由 `bin/sync-opencode-skills.py` 从 `skills/` 生成的镜像，不作为人工维护入口。修改任何 `skills/*/SKILL.md` 后，必须重新运行：
 
@@ -248,7 +248,7 @@ python bin/validate-agent-runtime.py
 | `skills/design-testcases-from-testpoints/` | 入口 skill，串联测试点规范化、上下文注入、设计、编写、审查和输出 | 完整测试用例设计报告、独立测试用例明细 |
 | `skills/testcase-design/` | 设计测试点到测试用例的转换方案，包括用例数量、类型、等级、覆盖意图和扩展策略 | 用例设计方案 |
 | `skills/testcase-writing/` | 编写完整可执行用例，生成用例名称、用例编号、用例等级、前置步骤、测试步骤和预期结果 | 可执行测试用例草稿 |
-| `skills/clarification-gate/` | 管理澄清问题，判断是否需要打断用户，合并用户确认信息 | 澄清会话记录、待确认问题 |
+| `skills/clarification-gate/` | 管理待确认问题，完成分级、去重和记录；不打断用户 | 待确认记录、最终报告待确认问题 |
 | `skills/memory-context-builder/` | 读取项目记忆、业务域记忆和历史测试经验 | 记忆上下文包 |
 | `skills/testcase-review/` | 审查用例质量，校验追溯矩阵、覆盖结论、重复项、等级一致性和质量门禁反馈 | 覆盖审查结果、质量门禁结果 |
 
@@ -300,9 +300,9 @@ Knowledge 按稳定知识域组织，供 skill 在运行时按需读取。
 |---|---|---|
 | `templates/testcase-design-input-template.md` | 测试用例设计输入包，包含需求信息、测试场景清单、测试场景详情、接口测试清单、接口测试详情、待确认信息和输入完整性自检；测试场景承载页面、业务流程、资料、性能、可靠性等对象，场景测试条件承载入口、用户/角色、前置条件、测试数据因子、业务设计约束和自由补充说明，接口测试对象承载接口契约、字段、错误码、幂等和鉴权等对象 | 输入准备、评审前补充上下文 |
 | `templates/testcase-design-plan-template.md` | 测试用例设计方案中间产物，统一 `testcase-design` 到 `testcase-writing` 的字段契约 | 设计阶段、编写阶段输入 |
-| `templates/testcase-report-template.md` | 完整测试用例设计报告，包含设计范围、输入摘要、澄清摘要、用例设计方案、用例明细、追溯矩阵、覆盖审查、质量门禁、专家评分、待确认问题和 memory 更新建议 | 默认交付报告 |
+| `templates/testcase-report-template.md` | 完整测试用例设计报告，包含设计范围、输入摘要、待确认处理摘要、用例设计方案、用例明细、追溯矩阵、覆盖审查、质量门禁、专家评分、待确认问题和 memory 更新建议 | 默认交付报告 |
 | `templates/testcase-detail-template.md` | 独立测试用例明细，只包含用例编号、用例名称、用例等级、前置步骤、测试步骤和预期结果 | 用例平台导入、专项评审 |
-| `templates/clarification-session-template.md` | 澄清问题、用户回答、未解决问题和上下文合并结果 | 澄清会话记录 |
+| `templates/clarification-session-template.md` | 待确认候选、已确认来源、未解决问题和上下文合并结果 | 待确认记录 |
 
 ## 7. 分层架构
 
@@ -312,7 +312,7 @@ flowchart TB
   MainSkill --> SkillLayer["Skill 设计动作层\n规范化 / 设计 / 编写 / 评审"]
   SkillLayer --> KnowledgeLayer["Knowledge 标准层\n测试类型 / 用例标准 / 编写准则 / 设计模式 / 覆盖追溯"]
   SkillLayer --> MemoryLayer["Memory 记忆层\n项目事实 / 账号数据 / 历史缺陷 / 偏好"]
-  SkillLayer --> TemplateLayer["Template 模板层\n报告 / 明细 / 澄清会话"]
+  SkillLayer --> TemplateLayer["Template 模板层\n报告 / 明细 / 待确认记录"]
   SkillLayer --> QualityLayer["质量门禁层\n结构 / 可执行 / 预期 / 追溯 / 覆盖"]
   QualityLayer --> ScriptLayer["确定性校验\nlint / semantic / smoke"]
   ScriptLayer --> Output["测试用例设计报告"]
@@ -336,7 +336,7 @@ flowchart TD
   A["输入测试点"] --> B["固定 PROJECT_ROOT\n创建 run 目录"]
   B --> C["构建 memory context-pack"]
   C --> D["输入规范化\n主入口 skill 内置"]
-  D --> E["澄清检查 CP-INPUT"]
+  D --> E["待确认检查 CP-INPUT"]
   E --> F["测试用例设计\ntestcase-design"]
   F --> G["测试用例编写\ntestcase-writing"]
   G --> H["追溯矩阵与用例审查\ntestcase-review"]
@@ -355,7 +355,7 @@ flowchart TD
 1. 固定当前会话工作目录为 `PROJECT_ROOT`，创建独立运行目录 `${PROJECT_ROOT}/outputs/runs/<run-id>/`；可使用 `bin/run-test-design.py <输入文件>` 准备运行目录、初始模板和上下文包。该脚本不调用模型生成测试用例，只负责准备运行骨架和校验已有产物。
 2. 使用 `memory-context-builder` 或 `bin/build-memory-context.py` 筛选本次相关项目上下文，生成 `context-pack.md`。domain memory 可通过 `keywords`、`aliases` 和 `entry_paths` metadata 提供稳定匹配信号，脚本可识别同一目标入口路径不一致的机械冲突。
 3. 在主入口 `design-testcases-from-testpoints` 内完成输入规范化：识别测试点字段、保留来源编号、检查明显缺口和重复项。
-4. 对缺失字段、编号重复、测试点含义不清、业务约束缺失执行澄清检查。
+4. 对缺失字段、编号重复、测试点含义不清、业务约束缺失执行待确认检查；所有未解决项只进入最终报告，不中途提问。
 5. 使用 `testcase-design` 为每条测试点制定用例设计方案，判断需要生成的用例数量、类型、等级、覆盖意图和扩展策略。
 6. 使用 `testcase-writing` 编写完整可执行用例，一次性生成用例名称、用例编号、用例等级、前置步骤、测试步骤和预期结果，保证操作与判定不脱节。
 7. 使用 `testcase-review` 生成或校验测试点到用例的追溯矩阵，并审查覆盖、重复、等级和可执行性问题。
@@ -473,7 +473,7 @@ flowchart LR
 | 主入口 | `design-testcases-from-testpoints` |
 | 用例设计 | `testcase-design` |
 | 用例编写 | `testcase-writing` |
-| 澄清治理 | `clarification-gate` |
+| 待确认治理 | `clarification-gate` |
 | 记忆注入 | `memory-context-builder` |
 | 追溯与质量审查 | `testcase-review` |
 
@@ -495,7 +495,7 @@ flowchart LR
 | `testcase-design-input-template.md` | 测试用例设计输入包模板 |
 | `testcase-report-template.md` | 完整测试用例设计报告模板 |
 | `testcase-detail-template.md` | 独立测试用例明细模板 |
-| `clarification-session-template.md` | 澄清问题、用户回答、未解决问题和上下文合并结果模板 |
+| `clarification-session-template.md` | 待确认候选、已确认来源、未解决问题和上下文合并结果模板 |
 
 ## 13. 输出契约
 
@@ -507,7 +507,7 @@ flowchart LR
 ## 1. 设计范围
 ## 2. 记忆上下文包摘要
 ## 3. 测试点输入摘要
-## 4. 交互澄清摘要
+## 4. 待确认处理摘要
 ## 5. 用例设计策略
 ## 6. 测试用例明细
 ## 7. 测试点到用例追溯矩阵
@@ -601,7 +601,7 @@ flowchart TD
 | `level-consistency-check.md` | 用例等级是否与测试点风险、业务影响和 memory 规则一致 |
 | `duplicate-testcase-check.md` | 是否存在重复、近似重复或只改名称不改验证目标的用例 |
 | `bin/build-memory-context.py` | 机械生成 `context-pack.md` 初稿，枚举并匹配本地 `memory/domains/*.md`，优先读取 domain metadata，并输出可识别的入口路径冲突 |
-| `bin/run-test-design.py` | 准备 run 目录、上下文包、澄清记录、设计方案和报告/明细初始文件，并可对已生成产物执行检查；不负责生成测试用例正文 |
+| `bin/run-test-design.py` | 准备 run 目录、上下文包、待确认记录、设计方案和报告/明细初始文件，并可对已生成产物执行检查；不负责生成测试用例正文 |
 | `bin/lint-testcase-report.py` | 机械检查报告结构、编号格式、必填字段、追溯矩阵、源测试点覆盖、质量门禁结果和未替换模板占位符 |
 | `bin/semantic-testcase-check.py` | 启发式检查步骤空泛、预期含糊、数据缺失和覆盖异常 |
 | `bin/smoke-test-design.py` | 对示例测试点执行回归验证 |
@@ -612,12 +612,12 @@ flowchart TD
 
 - 因输出质量失败：修正用例并重新执行质量门禁。
 - 因测试点信息缺失失败：生成待确认问题，保留无法可靠设计的测试点，不编造用例。
-- 因 memory 冲突失败：记录冲突来源，优先询问用户或采用当前输入中的显式事实。
+- 因 memory 冲突失败：记录冲突来源，优先采用当前输入中的显式事实，并写入最终报告待确认问题。
 - 因编号或格式失败：自动修复后重跑 lint。
 
-## 15. 澄清治理
+## 15. 待确认治理
 
-### 15.1 需要澄清的典型情况
+### 15.1 需要记录待确认的典型情况
 
 - 测试点没有明确被测对象或业务场景。
 - 生成可执行步骤必须知道账号、角色、入口、初始状态或数据约束，但输入和 memory 都未提供。
@@ -625,7 +625,7 @@ flowchart TD
 - 同一测试点存在互相冲突的需求依据或 memory 约定。
 - 高风险用例的预期结果无法可靠判定。
 
-### 15.2 不需要打断的情况
+### 15.2 继续生成的情况
 
 - 可使用中性占位表达且不影响用例结构，例如“准备一个满足条件的有效用户”。
 - 缺少低风险补充字段，但不影响主步骤和预期。
@@ -633,7 +633,7 @@ flowchart TD
 
 ### 15.3 待确认问题输出要求
 
-最终报告中的待确认问题只保留未解决项，已被用户回答、已被 memory 覆盖或重复的问题必须删除。每个问题应包含影响范围、阻塞等级和建议提问。
+最终报告中的待确认问题只保留未解决项，已被当前输入、已确认信息、memory 覆盖或重复的问题必须删除。每个问题应包含影响范围、阻塞等级和建议确认事项。运行过程中不得为了待确认问题中断用户；无法可靠生成的测试点应在追溯矩阵和质量门禁中标记为 `待确认`。
 
 ## 16. 用例等级规则
 
@@ -693,4 +693,4 @@ flowchart LR
   Design --> Cases["测试用例明细 TC-*"]
 ```
 
-Test-Design-Agent 不重新争夺需求分析职责，只在测试点信息不足以生成可执行用例时，提出澄清问题或标记待确认风险。
+Test-Design-Agent 不重新争夺需求分析职责，只在测试点信息不足以生成可执行用例时，于最终报告中标记待确认风险。
